@@ -13,6 +13,8 @@ import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.Set;
 
+import net.sf.persist.writer.Writer;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -197,32 +199,40 @@ public final class AnnotationTableMapping extends Mapping {
         return settersMap;
     }
 
+    public Optional<String> getFieldName(final String columnName) {
+        Optional<String> fieldName = Optional.ofNullable(columnsMap.get(columnName.toLowerCase(Locale.ENGLISH)));
+        if (!fieldName.isPresent()) {
+            ENGINE_LOG.warn("Column name [" + columnName + "] has no corresponding field.");
+        }
+        return fieldName;
+    }
+
     @Override
     public Method getGetterForColumn(final String columnName) {
-        final Optional<String> fieldName = Optional.ofNullable(columnsMap.get(columnName.toLowerCase(Locale.ENGLISH)));
-        if (!fieldName.isPresent()) {
-            throw new NoSuchElementException(
-                "Could not find field name corresponding to column name [" + columnName + "]");
+        final Optional<String> fieldName = getFieldName(columnName);
+        if (fieldName.isPresent()) {
+            final Optional<Method> getterForFieldName = Optional.ofNullable(gettersMap.get(fieldName.get()));
+            if (!getterForFieldName.isPresent()) {
+                throw new NoSuchElementException(
+                    "Could not find getter for columnn with field name [" + fieldName + "]");
+            }
+            return getterForFieldName.get();
         }
-        final Optional<Method> getterForFieldName = Optional.ofNullable(gettersMap.get(fieldName.get()));
-        if (!getterForFieldName.isPresent()) {
-            throw new NoSuchElementException("Could not find getter for columnn with field name [" + fieldName + "]");
-        }
-        return getterForFieldName.get();
+        return null;
     }
 
     @Override
     public Method getSetterForColumn(final String columnName) {
-        final Optional<String> fieldName = Optional.ofNullable(columnsMap.get(columnName.toLowerCase(Locale.ENGLISH)));
-        if (!fieldName.isPresent()) {
-            throw new NoSuchElementException(
-                "Could not find field name corresponding to column name [" + columnName + "]");
+        final Optional<String> fieldName = getFieldName(columnName);
+        if (fieldName.isPresent()) {
+            final Optional<Method> setterForFieldName = Optional.ofNullable(settersMap.get(fieldName.get()));
+            if (!setterForFieldName.isPresent()) {
+                throw new NoSuchElementException(
+                    "Could not find setter for columnn with field name [" + fieldName + "]");
+            }
+            return setterForFieldName.get();
         }
-        final Optional<Method> setterForFieldName = Optional.ofNullable(settersMap.get(fieldName.get()));
-        if (!setterForFieldName.isPresent()) {
-            throw new NoSuchElementException("Could not find setter for columnn with field name [" + fieldName + "]");
-        }
-        return setterForFieldName.get();
+        return null;
     }
 
     public String getSelectSql() {
@@ -247,18 +257,47 @@ public final class AnnotationTableMapping extends Mapping {
 
     @Override
     public Class<?> getOptionalSubType(final String columnName) {
-        final Optional<String> fieldName = Optional.ofNullable(columnsMap.get(columnName.toLowerCase(Locale.ENGLISH)));
-        if (!fieldName.isPresent()) {
-            throw new NoSuchElementException(
-                "Could not find field name corresponding to column name [" + columnName + "]");
+        final Optional<String> fieldName = getFieldName(columnName);
+        if (fieldName.isPresent()) {
+            final Optional<Class<?>> optSubTypeForFieldName =
+                Optional.ofNullable(annotationsMap.get(fieldName.get()).optionalSubType());
+            if (!optSubTypeForFieldName.isPresent()) {
+                throw new NoSuchElementException(
+                    "Could not find optional subtype for columnn with field name [" + fieldName + "]");
+            }
+            return optSubTypeForFieldName.get();
         }
-        final Optional<Class<?>> optSubTypeForFieldName =
-            Optional.ofNullable(annotationsMap.get(fieldName.get()).optionalSubType());
-        if (!optSubTypeForFieldName.isPresent()) {
-            throw new NoSuchElementException(
-                "Could not find optional subtype for columnn with field name [" + fieldName + "]");
+        return null;
+    }
+
+    @Override
+    public Class<?> getSerializationType(final String columnName) {
+        final Optional<String> fieldName = getFieldName(columnName);
+        if (fieldName.isPresent()) {
+            final Optional<Class<?>> serializationTypeForFieldName =
+                Optional.ofNullable(annotationsMap.get(fieldName.get()).serializeAs());
+            if (!serializationTypeForFieldName.isPresent()) {
+                throw new NoSuchElementException(
+                    "Could not find serialization type for columnn with field name [" + fieldName + "]");
+            }
+            return serializationTypeForFieldName.get();
         }
-        return optSubTypeForFieldName.get();
+        return null;
+    }
+
+    @Override
+    public Class<? extends Writer> getWriterClass(final String columnName) {
+        final Optional<String> fieldName = getFieldName(columnName);
+        if (fieldName.isPresent()) {
+            final Optional<Class<? extends Writer>> writerClassForFieldName =
+                Optional.ofNullable(annotationsMap.get(fieldName.get()).writerClass());
+            if (!writerClassForFieldName.isPresent()) {
+                throw new NoSuchElementException(
+                    "Could not find writer class for columnn with field name [" + fieldName + "]");
+            }
+            return writerClassForFieldName.get();
+        }
+        return null;
     }
 
     // ---------- helpers ----------

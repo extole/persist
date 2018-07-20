@@ -7,6 +7,8 @@ import java.sql.DatabaseMetaData;
 import java.util.HashMap;
 import java.util.Map;
 
+import net.sf.persist.writer.Writer;
+
 public abstract class Mapping {
 
     public abstract Method getGetterForColumn(String columnName);
@@ -14,6 +16,10 @@ public abstract class Mapping {
     public abstract Method getSetterForColumn(String columnName);
 
     public abstract Class<?> getOptionalSubType(String columnName);
+
+    public abstract Class<?> getSerializationType(String columnName);
+
+    public abstract Class<? extends Writer> getWriterClass(String columnName);
 
     // ---------- utility methods ----------
 

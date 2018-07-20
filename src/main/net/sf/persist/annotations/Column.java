@@ -7,6 +7,9 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
+import net.sf.persist.writer.VoidWriter;
+import net.sf.persist.writer.Writer;
+
 /**
  * Defines column mapping for a given field. Must be added to a getter or a
  * setter of the field being mapped.
@@ -35,8 +38,21 @@ public @interface Column {
     boolean primaryKey() default false;
 
     /**
-     * If the getter/setter use optional values, the subtype must be explicitly stated due to Java's generic
+     * If the getter/setter use optional values, the sub-type must be explicitly stated due to Java's generic
      * subtype handling.
      */
     Class<?> optionalSubType() default Void.class;
+
+    /**
+     * When using a custom, strongly-typed return type, the serialization type for table I/O must be declared.
+     * For standard serialization types, this does not need to be set, but note that, when reading/writing the
+     * table, setting this serialization type will override the getter/setter type corresponding to the field.
+     */
+    Class<?> serializeAs() default Void.class;
+
+    /**
+     * For a custom type, a writer class (extending net.sf.persist.writer.Writer) must be created and referenced
+     * here, which specifies how to convert a custom type to/from a serialization type.
+     */
+    Class<? extends Writer> writerClass() default VoidWriter.class;
 }

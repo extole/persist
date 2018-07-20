@@ -22,6 +22,9 @@ import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
+import net.sf.persist.writer.VoidWriter;
+import net.sf.persist.writer.Writer;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -232,6 +235,7 @@ public final class Persist {
         }
 
         return mappingCache.get(objectClass);
+
     }
 
     /**
@@ -477,8 +481,8 @@ public final class Persist {
      * Reader or InputStream parameter
      * @since 1.0
      */
-    public static void setParameters(final PreparedStatement stmt, final Object[] parameters) {
 
+    public static void setParameters(final PreparedStatement stmt, final Object[] parameters) {
         // if no parameters, do nothing
         if (parameters == null || parameters.length == 0) {
             return;
@@ -519,12 +523,12 @@ public final class Persist {
                     stmt.setNull(i, sqlType);
                 } catch (SQLException e) {
                     throw new RuntimeSQLException("Could not set null into parameter [" + i
-                            + "] using java.sql.Types [" + Log.sqlTypeToString(sqlType) + "] " + e.getMessage(), e);
+                        + "] using java.sql.Types [" + Log.sqlTypeToString(sqlType) + "] " + e.getMessage(), e);
                 }
 
                 if (PARAMETERS_LOG.isDebugEnabled()) {
                     PARAMETERS_LOG.debug("Parameter [" + i + "] from PreparedStatement [" + stmt
-                            + "] set to [null] using java.sql.Types [" + Log.sqlTypeToString(sqlType) + "]");
+                        + "] set to [null] using java.sql.Types [" + Log.sqlTypeToString(sqlType) + "]");
                 }
 
                 continue;
@@ -636,7 +640,7 @@ public final class Persist {
                 } else if (type == java.sql.Timestamp.class) {
                     stmt.setTimestamp(i, (java.sql.Timestamp) parameter);
                 } else if (parameter instanceof java.lang.Enum) {
-                    stmt.setString(i, ((Enum)parameter).name());
+                    stmt.setString(i, ((Enum) parameter).name());
                 } else {
                     // last resort; this should cover all database-specific
                     // object types
@@ -645,7 +649,207 @@ public final class Persist {
 
                 if (PARAMETERS_LOG.isDebugEnabled()) {
                     PARAMETERS_LOG.debug("PreparedStatement [" + stmt + "] Parameter [" + i + "] type ["
-                            + type.getSimpleName() + "] set to [" + Log.objectToString(parameter) + "]");
+                        + type.getSimpleName() + "] set to [" + Log.objectToString(parameter) + "]");
+                }
+
+            } catch (SQLException e) {
+                throw new RuntimeSQLException(e);
+            }
+        }
+    }
+
+
+    public static void setParameters(final PreparedStatement stmt, final Class<?>[] serializationTypes,
+        final Class<? extends Writer>[] writerClasses, final Object[] parameters) {
+
+        // if no parameters, do nothing
+        if (parameters == null || parameters.length == 0) {
+            return;
+        }
+
+
+        ParameterMetaData stmtMetaData = null;
+
+        for (int i = 1; i <= parameters.length; i++) {
+
+            //parameter, serializationType, and writerClass arrays are all ordered corresponding to the same columns
+            Object parameter = parameters[i - 1];
+            Class<?> serializationType = serializationTypes[i - 1];
+            Class<? extends Writer> writerClass = writerClasses[i - 1];
+
+            if (parameter != null && parameter.getClass() == Optional.class) {
+                Optional<?> instanceOfParameter = (Optional<?>) parameter;
+                parameter = instanceOfParameter.orElse(null);
+            }
+
+            if (parameter == null) {
+
+                // lazy assignment of stmtMetaData
+                if (stmtMetaData == null) {
+                    try {
+                        stmtMetaData = stmt.getParameterMetaData();
+                    } catch (SQLException e) {
+                        throw new RuntimeSQLException(e);
+                    }
+                }
+
+                // get sql type from prepared statement metadata
+                int sqlType;
+                try {
+                    sqlType = stmtMetaData.getParameterType(i);
+                } catch (SQLException e2) {
+                    // feature not supported, use NULL
+                    sqlType = java.sql.Types.NULL;
+                }
+
+                try {
+                    stmt.setNull(i, sqlType);
+                } catch (SQLException e) {
+                    throw new RuntimeSQLException("Could not set null into parameter [" + i
+                        + "] using java.sql.Types [" + Log.sqlTypeToString(sqlType) + "] " + e.getMessage(), e);
+                }
+
+                if (PARAMETERS_LOG.isDebugEnabled()) {
+                    PARAMETERS_LOG.debug("Parameter [" + i + "] from PreparedStatement [" + stmt
+                        + "] set to [null] using java.sql.Types [" + Log.sqlTypeToString(sqlType) + "]");
+                }
+
+                continue;
+            }
+
+            if ((serializationType != Void.class) && (writerClass == VoidWriter.class)) {
+                throw new PersistException(
+                    "Serialization type set as [" + serializationType.getName()
+                        + "] but writerClass was VoidWriter.class");
+            } else if ((serializationType == Void.class) && (writerClass != VoidWriter.class)) {
+                PARAMETERS_LOG.error("No serialization type was set but writerClass was not VoidWriter.class");
+            }
+
+            if ((serializationType != Void.class) && (writerClass != VoidWriter.class)) {
+                try {
+                    parameter = writerClass.newInstance().readFromStrongType(parameter);
+                } catch (InstantiationException | IllegalAccessException e) {
+                    throw new PersistException(
+                        "Failed to create new instance of writer class [" + writerClass.getName() + "]");
+                }
+            }
+
+            try {
+
+                final Class type = parameter.getClass();
+
+                if (type == Boolean.class || type == boolean.class) {
+                    stmt.setBoolean(i, (Boolean) parameter);
+                } else if (type == Byte.class || type == byte.class) {
+                    stmt.setByte(i, (Byte) parameter);
+                } else if (type == Short.class || type == short.class) {
+                    stmt.setShort(i, (Short) parameter);
+                } else if (type == Integer.class || type == int.class) {
+                    stmt.setInt(i, (Integer) parameter);
+                } else if (type == Long.class || type == long.class) {
+                    stmt.setLong(i, (Long) parameter);
+                } else if (type == Float.class || type == float.class) {
+                    stmt.setFloat(i, (Float) parameter);
+                } else if (type == Double.class || type == double.class) {
+                    stmt.setDouble(i, (Double) parameter);
+                } else if (type == Character.class || type == char.class) {
+                    stmt.setString(i, parameter == null ? null : "" + parameter);
+                } else if (type == char[].class) {
+                    // not efficient, will create a new String object
+                    stmt.setString(i, parameter == null ? null : new String((char[]) parameter));
+                } else if (type == Character[].class) {
+                    // not efficient, will duplicate the array and create a new String object
+                    final Character[] src = (Character[]) parameter;
+                    final char[] dst = new char[src.length];
+                    for (int j = 0; j < src.length; j++) { // can't use System.arraycopy here
+                        dst[j] = src[j];
+                    }
+                    stmt.setString(i, new String(dst));
+                } else if (type == String.class) {
+                    stmt.setString(i, (String) parameter);
+                } else if (type == BigDecimal.class) {
+                    stmt.setBigDecimal(i, (BigDecimal) parameter);
+                } else if (type == byte[].class) {
+                    stmt.setBytes(i, (byte[]) parameter);
+                } else if (type == Byte[].class) {
+                    // not efficient, will duplicate the array
+                    final Byte[] src = (Byte[]) parameter;
+                    final byte[] dst = new byte[src.length];
+                    for (int j = 0; j < src.length; j++) { // can't use System.arraycopy here
+                        dst[j] = src[j];
+                    }
+                    stmt.setBytes(i, dst);
+                } else if (parameter instanceof java.io.Reader) {
+                    final java.io.Reader reader = (java.io.Reader) parameter;
+
+                    // the jdbc api for setCharacterStream requires the number
+                    // of characters to be read so this will end up reading
+                    // data twice (here and inside the jdbc driver)
+                    // besides, the reader must support reset()
+                    int size = 0;
+                    try {
+                        if (reader instanceof SizeAware) {
+                            size = ((SizeAware) reader).size();
+                        } else {
+                            reader.reset();
+                            while (reader.read() != -1) {
+                                size++;
+                            }
+                            reader.reset();
+                        }
+                    } catch (IOException e) {
+                        throw new RuntimeIOException(e);
+                    }
+                    stmt.setCharacterStream(i, reader, size);
+                } else if (parameter instanceof java.io.InputStream) {
+                    final java.io.InputStream inputStream = (java.io.InputStream) parameter;
+
+                    // the jdbc api for setBinaryStream requires the number of
+                    // bytes to be read so this will end up reading the stream
+                    // twice (here and inside the jdbc driver)
+                    // besides, the stream must support reset()
+                    int size = 0;
+                    try {
+                        if (inputStream instanceof SizeAware) {
+                            size = ((SizeAware) inputStream).size();
+                        } else {
+                            inputStream.reset();
+                            while (inputStream.read() != -1) {
+                                size++;
+                            }
+                            inputStream.reset();
+                        }
+                    } catch (IOException e) {
+                        throw new RuntimeIOException(e);
+                    }
+                    stmt.setBinaryStream(i, inputStream, size);
+                } else if (parameter instanceof Clob) {
+                    stmt.setClob(i, (Clob) parameter);
+                } else if (parameter instanceof Blob) {
+                    stmt.setBlob(i, (Blob) parameter);
+                } else if (type == java.time.Instant.class) {
+                    final java.time.Instant instant = (java.time.Instant) parameter;
+                    stmt.setTimestamp(i, new java.sql.Timestamp(instant.toEpochMilli()));
+                } else if (type == java.util.Date.class) {
+                    final java.util.Date date = (java.util.Date) parameter;
+                    stmt.setTimestamp(i, new java.sql.Timestamp(date.getTime()));
+                } else if (type == java.sql.Date.class) {
+                    stmt.setDate(i, (java.sql.Date) parameter);
+                } else if (type == java.sql.Time.class) {
+                    stmt.setTime(i, (java.sql.Time) parameter);
+                } else if (type == java.sql.Timestamp.class) {
+                    stmt.setTimestamp(i, (java.sql.Timestamp) parameter);
+                } else if (parameter instanceof java.lang.Enum) {
+                    stmt.setString(i, ((Enum) parameter).name());
+                } else {
+                    // last resort; this should cover all database-specific
+                    // object types
+                    stmt.setObject(i, parameter);
+                }
+
+                if (PARAMETERS_LOG.isDebugEnabled()) {
+                    PARAMETERS_LOG.debug("PreparedStatement [" + stmt + "] Parameter [" + i + "] type ["
+                        + type.getSimpleName() + "] set to [" + Log.objectToString(parameter) + "]");
                 }
 
             } catch (SQLException e) {
@@ -1011,6 +1215,26 @@ public final class Persist {
         return parameters;
     }
 
+    private static Class[] getSerializationTypesFromObject(final Object object, final String[] columns,
+        final AnnotationTableMapping mapping) {
+
+        Class[] serializationTypes = new Class[columns.length];
+        for (int i = 0; i < columns.length; i++) {
+            serializationTypes[i] = mapping.getSerializationType(columns[i]);
+        }
+        return serializationTypes;
+    }
+
+    private static Class[] getWriterClassesFromObject(final Object object, final String[] columns,
+        final AnnotationTableMapping mapping) {
+
+        Class[] writerClasses = new Class[columns.length];
+        for (int i = 0; i < columns.length; i++) {
+            writerClasses[i] = mapping.getWriterClass(columns[i]);
+        }
+        return writerClasses;
+    }
+
     /**
      * Reads a row from the provided {@link java.sql.ResultSet} and converts it
      * to an object instance of the given class.
@@ -1068,8 +1292,10 @@ public final class Persist {
                         + "] from result set does not have a mapping to a field in [" + objectClass.getName() + "]");
                 } else {
 
-                    final Class<?> type = setter.getParameterTypes()[0];
-                    final Class<?> optionalSubType = mapping.getOptionalSubType(columnName);
+                    Class<?> type = setter.getParameterTypes()[0];
+                    Class<?> optionalSubType = mapping.getOptionalSubType(columnName);
+                    final Class<?> serializationType = mapping.getSerializationType(columnName);
+                    final Class<? extends Writer> writerClass = mapping.getWriterClass(columnName);
 
                     if ((type == Optional.class) && (optionalSubType == Void.class)) {
                         throw new PersistException(
@@ -1078,14 +1304,40 @@ public final class Persist {
                         PARAMETERS_LOG.error("Column type was not Optional but optionalSubType was not Void.class");
                     }
 
-                    Object value;
-
-                    if (type == Optional.class) {
-                        value = getValueFromResultSetOptional(resultSet, i, optionalSubType);
-                    } else {
-                        value = getValueFromResultSet(resultSet, i, type);
+                    if ((serializationType != Void.class) && (writerClass == VoidWriter.class)) {
+                        throw new PersistException(
+                            "Column [" + columnName
+                                + "] had a serialization type set but writerClass was VoidWriter.class");
+                    } else if ((serializationType == Void.class) && (writerClass != VoidWriter.class)) {
+                        PARAMETERS_LOG.error("No serialization type was set but writerClass was not VoidWriter.class");
                     }
 
+                    Object value;
+
+                    // If there is a properly-implemented serialization type, then Persist should get the value
+                    // using the serialization type, then use the writer class to create an object of the desired type
+                    if ((serializationType != Void.class) && (writerClass != VoidWriter.class)) {
+                        Object serializedValue;
+                        if (type == Optional.class) {
+                            optionalSubType = serializationType;
+                            serializedValue = getValueFromResultSetOptional(resultSet, i, optionalSubType);
+                        } else {
+                            type = serializationType;
+                            serializedValue = getValueFromResultSet(resultSet, i, type);
+                        }
+                        try {
+                            value = writerClass.newInstance().writeToStrongType(serializedValue);
+                        } catch (InstantiationException | IllegalAccessException e) {
+                            throw new PersistException(
+                                "Failed to create new instance of writer class for column [" + columnName + "]");
+                        }
+                    } else {
+                        if (type == Optional.class) {
+                            value = getValueFromResultSetOptional(resultSet, i, optionalSubType);
+                        } else {
+                            value = getValueFromResultSet(resultSet, i, type);
+                        }
+                    }
 
                     try {
                         setter.invoke(ret, value);
@@ -1145,7 +1397,19 @@ public final class Persist {
             for (int i = 0; i < mapping.getAutoGeneratedColumns().length; i++) {
                 final String columnName = mapping.getAutoGeneratedColumns()[i];
                 final Method setter = mapping.getSetterForColumn(columnName);
-                final Object key = result.getGeneratedKeys().get(i);
+
+                Object key;
+                if (Void.class.equals((mapping.getSerializationType(columnName)))) {
+                    key = result.getGeneratedKeys().get(i);
+                } else {
+                    final Object serializedKey = result.getGeneratedKeys().get(i);
+                    try {
+                        key = mapping.getWriterClass(columnName).newInstance().writeToStrongType(serializedKey);
+                    } catch (InstantiationException | IllegalAccessException e) {
+                        throw new PersistException(
+                            "Failed to create new instance of writer class for column [" + columnName + "]");
+                    }
+                }
                 try {
                     setter.invoke(object, key);
                 } catch (Exception e) {
@@ -1177,7 +1441,7 @@ public final class Persist {
      */
     @SuppressWarnings("unchecked")
     public Result executeUpdate(final Class objectClass, final String sql, final String[] autoGeneratedKeys,
-            final Object...parameters) {
+        final Class[] serializationTypes, final Class[] writerClasses, final Object... parameters) {
 
         long begin = 0;
         if (PROFILING_LOG.isDebugEnabled()) {
@@ -1187,7 +1451,7 @@ public final class Persist {
         final PreparedStatement stmt = getPreparedStatement(sql, autoGeneratedKeys);
 
         try {
-            setParameters(stmt, parameters);
+            setParameters(stmt, serializationTypes, writerClasses, parameters);
 
             int rowsModified = 0;
             try {
@@ -1235,6 +1499,67 @@ public final class Persist {
         }
     }
 
+    @SuppressWarnings("unchecked")
+    public Result executeUpdate(final Class objectClass, final String sql, final String[] autoGeneratedKeys,
+        final Object... parameters) {
+
+        long begin = 0;
+        if (PROFILING_LOG.isDebugEnabled()) {
+            begin = System.currentTimeMillis();
+        }
+
+        final PreparedStatement stmt = getPreparedStatement(sql, autoGeneratedKeys);
+
+        try {
+            setParameters(stmt, parameters);
+
+            int rowsModified = 0;
+            try {
+                rowsModified = stmt.executeUpdate();
+            } catch (SQLException e) {
+                throw new RuntimeSQLException("Error executing sql [" + sql + "] with parameters "
+                    + Arrays.toString(parameters) + ": " + e.getMessage(), e);
+            }
+
+            final List generatedKeys = new ArrayList();
+            if (autoGeneratedKeys.length != 0) {
+                try {
+                    final Mapping mapping = getMapping(objectClass);
+                    final ResultSet resultSet = stmt.getGeneratedKeys();
+                    for (String autoGeneratedKey : autoGeneratedKeys) {
+                        resultSet.next();
+
+                        // get the auto-generated key using the ResultSet.get method
+                        // that matches
+                        // the bean setter parameter type
+                        final Method setter = mapping.getSetterForColumn(autoGeneratedKey);
+                        final Class type = setter.getParameterTypes()[0];
+                        final Object value = Persist.getValueFromResultSet(resultSet, 1, type);
+
+                        generatedKeys.add(value);
+                    }
+                    resultSet.close();
+                } catch (SQLException e) {
+                    throw new RuntimeSQLException(
+                        "This JDBC driver does not support PreparedStatement.getGeneratedKeys()."
+                            + " Please use setUpdateAutoGeneratedKeys(false) in your Persist instance"
+                            + " to disable attempts to use that feature");
+                }
+            }
+
+            Result result = new Result(rowsModified, generatedKeys);
+
+            if (PROFILING_LOG.isDebugEnabled()) {
+                final long end = System.currentTimeMillis();
+                PROFILING_LOG.debug("executeUpdate in [{}ms] for sql [{}]", (end - begin), sql);
+            }
+
+            return result;
+        } finally {
+            closePreparedStatement(stmt);
+        }
+    }
+
     /**
      * Executes an update and returns the number of rows modified.
      * <p>
@@ -1245,7 +1570,27 @@ public final class Persist {
      * @param parameters Parameters to be used in the PreparedStatement.
      * @since 1.0
      */
-    public int executeUpdate(final String sql, final Object...parameters) {
+    public int executeUpdate(final String sql, final Class[] serializationTypes, final Class[] writerClasses,
+        final Object... parameters) {
+
+        final PreparedStatement stmt = getPreparedStatement(sql);
+
+        try {
+            int rowsModified = 0;
+
+            setParameters(stmt, serializationTypes, writerClasses, parameters);
+            rowsModified = stmt.executeUpdate();
+
+            return rowsModified;
+        } catch (SQLException e) {
+            throw new RuntimeSQLException("Error executing sql [" + sql + "] with parameters "
+                    + Arrays.toString(parameters) + ": " + e.getMessage(), e);
+        } finally {
+            closePreparedStatement(stmt);
+        }
+    }
+
+    public int executeUpdate(final String sql, final Object... parameters) {
 
         final PreparedStatement stmt = getPreparedStatement(sql);
 
@@ -1258,7 +1603,7 @@ public final class Persist {
             return rowsModified;
         } catch (SQLException e) {
             throw new RuntimeSQLException("Error executing sql [" + sql + "] with parameters "
-                    + Arrays.toString(parameters) + ": " + e.getMessage(), e);
+                + Arrays.toString(parameters) + ": " + e.getMessage(), e);
         } finally {
             closePreparedStatement(stmt);
         }
@@ -1277,14 +1622,18 @@ public final class Persist {
         final String[] columns = mapping.getNotAutoGeneratedColumns();
         final Object[] parameters = getParametersFromObject(object, columns, mapping);
 
+        final Class[] serializationTypes = getSerializationTypesFromObject(object, columns, mapping);
+        final Class[] writerClasses = getWriterClassesFromObject(object, columns, mapping);
+
         int ret = 0;
         if (updateAutoGeneratedKeys) {
-            final Result result = executeUpdate(object.getClass(), sql, mapping.getAutoGeneratedColumns(), parameters);
+            final Result result = executeUpdate(object.getClass(), sql, mapping.getAutoGeneratedColumns(),
+                serializationTypes, writerClasses, parameters);
             setAutoGeneratedKeys(object, result);
             ret = result.getRowsModified();
 
         } else {
-            ret = executeUpdate(sql, parameters);
+            ret = executeUpdate(sql, serializationTypes, writerClasses, parameters);
         }
         return ret;
     }
@@ -1331,7 +1680,11 @@ public final class Persist {
             columns[i++] = primaryKey;
         }
         final Object[] parameters = getParametersFromObject(object, columns, mapping);
-        return executeUpdate(sql, parameters);
+
+        final Class[] serializationTypes = getSerializationTypesFromObject(object, columns, mapping);
+        final Class[] writerClasses = getWriterClassesFromObject(object, columns, mapping);
+
+        return executeUpdate(sql, serializationTypes, writerClasses, parameters);
     }
 
     /**
@@ -1371,7 +1724,11 @@ public final class Persist {
         final String sql = mapping.getDeleteSql();
         final String[] columns = mapping.getPrimaryKeys();
         final Object[] parameters = getParametersFromObject(object, columns, mapping);
-        return executeUpdate(sql, parameters);
+
+        final Class[] serializationTypes = getSerializationTypesFromObject(object, columns, mapping);
+        final Class[] writerClasses = getWriterClassesFromObject(object, columns, mapping);
+
+        return executeUpdate(sql, serializationTypes, writerClasses, parameters);
     }
 
     /**
