@@ -7,11 +7,19 @@ import java.sql.DatabaseMetaData;
 import java.util.HashMap;
 import java.util.Map;
 
+import net.sf.persist.writer.Writer;
+
 public abstract class Mapping {
 
     public abstract Method getGetterForColumn(String columnName);
 
     public abstract Method getSetterForColumn(String columnName);
+
+    public abstract Class<?> getOptionalSubType(String columnName);
+
+    public abstract Class<?> getSerializationType(String columnName);
+
+    public abstract Class<? extends Writer> getWriterClass(String columnName);
 
     // ---------- utility methods ----------
 
@@ -49,7 +57,7 @@ public abstract class Mapping {
 
         // create map with all getters and setters
 
-        final Map<String, Method[]> allMethods = new HashMap<String, Method[]>();
+        final Map<String, Method[]> allMethods = new HashMap<>();
         for (Method method : methods) {
             final String name = method.getName();
 
@@ -86,9 +94,10 @@ public abstract class Mapping {
         // a field is only taken into consideration if it has a getter and a
         // setter
 
-        final Map<String, net.sf.persist.annotations.Column> annotationsMap = new HashMap<String, net.sf.persist.annotations.Column>();
-        final Map<String, Method> gettersMap = new HashMap<String, Method>();
-        final Map<String, Method> settersMap = new HashMap<String, Method>();
+        final Map<String, net.sf.persist.annotations.Column> annotationsMap = new HashMap<>();
+        final Map<String, Method> gettersMap = new HashMap<>();
+        final Map<String, Method> settersMap = new HashMap<>();
+        final Map<String, Class<?>> optionalSubTypeMap = new HashMap<>();
 
         for (String suffix : allMethods.keySet()) {
 

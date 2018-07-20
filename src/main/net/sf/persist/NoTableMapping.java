@@ -4,8 +4,16 @@ package net.sf.persist;
 
 import java.lang.reflect.Method;
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
+import java.util.NoSuchElementException;
+import java.util.Optional;
 import java.util.Set;
+
+import net.sf.persist.writer.Writer;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Represents the mapping of columns to getters and setters of a POJO.
@@ -16,6 +24,8 @@ import java.util.Set;
  * store data from queries.
  */
 public class NoTableMapping extends Mapping {
+
+    private static final Logger ENGINE_LOG = LoggerFactory.getLogger("persist.engine");
 
     // POJO class
     private final Class objectClass;
@@ -29,6 +39,8 @@ public class NoTableMapping extends Mapping {
     // map possible column names to field names
     private final Map<String, String> columnsMap;
 
+    private final Map<String, net.sf.persist.annotations.Column> annotationsMap;
+
     public NoTableMapping(Class objectClass, NameGuesser nameGuesser) {
 
         checkAnnotation(objectClass);
@@ -37,7 +49,7 @@ public class NoTableMapping extends Mapping {
 
         // get the list of annotations, getters and setters
         Map[] fieldsMaps = Mapping.getFieldsMaps(objectClass);
-        final Map<String, net.sf.persist.annotations.Column> annotationsMap = fieldsMaps[0];
+        annotationsMap = fieldsMaps[0];
         gettersMap = fieldsMaps[1];
         settersMap = fieldsMaps[2];
 
@@ -91,16 +103,10 @@ public class NoTableMapping extends Mapping {
 
     }
 
-    /**
-     * Returns the field name associated with a given column. If a mapping can't
-     * be found, will throw a PersistException.
-     */
-    public String getFieldNameForColumn(String columnName) {
-        String fieldName = columnsMap.get(columnName);
-        if (fieldName == null) {
-            throw new PersistException("Could map field for column [" + columnName + "] on class ["
-                    + objectClass.getCanonicalName()
-                    + "]. Please specify an explict @Column annotation for that column.");
+    public Optional<String> getFieldName(final String columnName) {
+        Optional<String> fieldName = Optional.ofNullable(columnsMap.get(columnName.toLowerCase(Locale.ENGLISH)));
+        if (!fieldName.isPresent()) {
+            ENGINE_LOG.warn("Column name [" + columnName + "] has no corresponding field.");
         }
         return fieldName;
     }
@@ -112,9 +118,17 @@ public class NoTableMapping extends Mapping {
      * @see Mapping
      */
     @Override
-    public Method getSetterForColumn(String columnName) {
-        String fieldName = getFieldNameForColumn(columnName);
-        return settersMap.get(fieldName);
+    public Method getSetterForColumn(final String columnName) {
+        final Optional<String> fieldName = getFieldName(columnName);
+        if (fieldName.isPresent()) {
+            final Optional<Method> setterForFieldName = Optional.ofNullable(settersMap.get(fieldName.get()));
+            if (!setterForFieldName.isPresent()) {
+                throw new NoSuchElementException(
+                    "Could not find setter for columnn with field name [" + fieldName + "]");
+            }
+            return setterForFieldName.get();
+        }
+        return null;
     }
 
     /**
@@ -124,10 +138,64 @@ public class NoTableMapping extends Mapping {
      * @see Mapping
      */
     @Override
-    public Method getGetterForColumn(String columnName) {
-        String fieldName = getFieldNameForColumn(columnName);
-        return gettersMap.get(fieldName);
+    public Method getGetterForColumn(final String columnName) {
+        final Optional<String> fieldName = getFieldName(columnName);
+        if (fieldName.isPresent()) {
+            final Optional<Method> getterForFieldName = Optional.ofNullable(gettersMap.get(fieldName.get()));
+            if (!getterForFieldName.isPresent()) {
+                throw new NoSuchElementException(
+                    "Could not find getter for columnn with field name [" + fieldName + "]");
+            }
+            return getterForFieldName.get();
+        }
+        return null;
     }
+
+    @Override
+    public Class<?> getOptionalSubType(final String columnName) {
+        final Optional<String> fieldName = getFieldName(columnName);
+        if (fieldName.isPresent()) {
+            final Optional<Class<?>> optSubTypeForFieldName =
+                Optional.ofNullable(annotationsMap.get(fieldName.get()).optionalSubType());
+            if (!optSubTypeForFieldName.isPresent()) {
+                throw new NoSuchElementException(
+                    "Could not find optional subtype for columnn with field name [" + fieldName + "]");
+            }
+            return optSubTypeForFieldName.get();
+        }
+        return null;
+    }
+
+    @Override
+    public Class<?> getSerializationType(final String columnName) {
+        final Optional<String> fieldName = getFieldName(columnName);
+        if (fieldName.isPresent()) {
+            final Optional<Class<?>> serializationTypeForFieldName =
+                Optional.ofNullable(annotationsMap.get(fieldName.get()).serializeAs());
+            if (!serializationTypeForFieldName.isPresent()) {
+                throw new NoSuchElementException(
+                    "Could not find serialization type for columnn with field name [" + fieldName + "]");
+            }
+            return serializationTypeForFieldName.get();
+        }
+        return null;
+    }
+
+    @Override
+    public Class<? extends Writer> getWriterClass(final String columnName) {
+        final Optional<String> fieldName = getFieldName(columnName);
+        if (fieldName.isPresent()) {
+            final Optional<Class<? extends Writer>> writerClassForFieldName =
+                Optional.ofNullable(annotationsMap.get(fieldName.get()).writerClass());
+            if (!writerClassForFieldName.isPresent()) {
+                throw new NoSuchElementException(
+                    "Could not find writer class for columnn with field name [" + fieldName + "]");
+            }
+            return writerClassForFieldName.get();
+        }
+        return null;
+    }
+
 
     /**
      * Checks if a given column name conflicts with an existing name in the
