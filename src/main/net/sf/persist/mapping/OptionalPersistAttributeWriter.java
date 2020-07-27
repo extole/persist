@@ -1,11 +1,11 @@
 package net.sf.persist.mapping;
 
+import net.sf.persist.PersistException;
+
 import java.lang.reflect.Method;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.util.Optional;
-
-import net.sf.persist.PersistException;
 
 public class OptionalPersistAttributeWriter implements PersistAttributeWriter {
     @Override
@@ -16,17 +16,26 @@ public class OptionalPersistAttributeWriter implements PersistAttributeWriter {
     @Override
     public Class getJDBCDataType(Method setter) {
         Type setterParameterType = setter.getGenericParameterTypes()[0];
-        checkTypeIsParameterized(setterParameterType, setter);
+        checkTypeIsParameterizedWithClass(setterParameterType, setter);
         return getParameterizedType(setterParameterType);
     }
 
-    private void checkTypeIsParameterized(Type genericParameterType, Method setter) {
+    private void checkTypeIsParameterizedWithClass(Type genericParameterType, Method setter) {
+        String errorMessage = String.format("Optional of setter [%s] must be parameterized with an exact class", setter);
+
         if (!(genericParameterType instanceof ParameterizedType)) {
-            throw new PersistException(String.format("Optional of setter [%s] must be parameterized", setter));
+            throw new PersistException(errorMessage);
+        }
+
+        Type typeArgument = ((ParameterizedType) genericParameterType).getActualTypeArguments()[0];
+        if (!(typeArgument instanceof Class)) {
+            throw new PersistException(errorMessage);
         }
     }
 
     private Class getParameterizedType(Type genericParameterType) {
-        return (Class) ((ParameterizedType) genericParameterType).getActualTypeArguments()[0];
+        Type typeArgument = ((ParameterizedType) genericParameterType).getActualTypeArguments()[0];
+
+        return (Class) typeArgument;
     }
 }
