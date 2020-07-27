@@ -16,44 +16,44 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class PersistRegistry {
-  private static final Logger LOG = LoggerFactory.getLogger("persist.engine");
-  private static final PersistRegistry INSTANCE = new PersistRegistry();
-  public static final DefaultPersistAttributeWriter DEFAULT_PERSIST_ATTRIBUTE_WRITER = new DefaultPersistAttributeWriter();
-  public static final DefaultPersistAttributeReader DEFAULT_PERSIST_ATTRIBUTE_READER = new DefaultPersistAttributeReader();
+    private static final Logger LOG = LoggerFactory.getLogger("persist.engine");
+    private static final PersistRegistry INSTANCE = new PersistRegistry();
+    public static final DefaultPersistAttributeWriter DEFAULT_PERSIST_ATTRIBUTE_WRITER = new DefaultPersistAttributeWriter();
+    public static final DefaultPersistAttributeReader DEFAULT_PERSIST_ATTRIBUTE_READER = new DefaultPersistAttributeReader();
 
-  private final Map<Class, PersistAttributeReader> persistAttributeReaders = new ConcurrentHashMap<>();
-  private final Map<Class, PersistAttributeWriter> persistAttributeWriters = new ConcurrentHashMap<>();
+    private final Map<Class, PersistAttributeReader> persistAttributeReaders = new ConcurrentHashMap<>();
+    private final Map<Class, PersistAttributeWriter> persistAttributeWriters = new ConcurrentHashMap<>();
 
-  public static PersistRegistry getInstance() {
-    return INSTANCE;
-  }
-
-  private PersistRegistry() {
-    registerPersistAttributeReader(Optional.class, new OptionalPersistAttributeReader());
-    registerPersistAttributeWriter(Optional.class, new OptionalPersistAttributeWriter());
-  }
-
-  public void registerPersistAttributeReader(Class clazz, PersistAttributeReader persistAttributeReader) {
-    if (persistAttributeReaders.containsKey(clazz)) {
-      LOG.warn("Overriding PersistAttributeReader for type {}", clazz);
+    public static PersistRegistry getInstance() {
+        return INSTANCE;
     }
-    persistAttributeReaders.put(clazz, persistAttributeReader);
-  }
 
-  public void registerPersistAttributeWriter(Class clazz, PersistAttributeWriter persistAttributeWriter) {
-    if (persistAttributeReaders.containsKey(clazz)) {
-      LOG.warn("Overriding PersistAttributeWriter for type {}", clazz);
+    private PersistRegistry() {
+        registerPersistAttributeReader(Optional.class, new OptionalPersistAttributeReader());
+        registerPersistAttributeWriter(Optional.class, new OptionalPersistAttributeWriter());
     }
-    persistAttributeWriters.put(clazz, persistAttributeWriter);
-  }
 
-  public PersistAttributeReader getPersistAttributeReader(Method getter) {
-    return persistAttributeReaders.getOrDefault(getter.getReturnType(), DEFAULT_PERSIST_ATTRIBUTE_READER);
-  }
+    public void registerPersistAttributeReader(Class clazz, PersistAttributeReader persistAttributeReader) {
+        if (persistAttributeReaders.containsKey(clazz)) {
+            LOG.warn("Overriding PersistAttributeReader for type {}", clazz);
+        }
+        persistAttributeReaders.put(clazz, persistAttributeReader);
+    }
 
-  public PersistAttributeWriter getPersistAttributeWriter(Method setter) {
-    Class<?>[] parameterTypes = setter.getParameterTypes();
+    public void registerPersistAttributeWriter(Class clazz, PersistAttributeWriter persistAttributeWriter) {
+        if (persistAttributeReaders.containsKey(clazz)) {
+            LOG.warn("Overriding PersistAttributeWriter for type {}", clazz);
+        }
+        persistAttributeWriters.put(clazz, persistAttributeWriter);
+    }
 
-    return persistAttributeWriters.getOrDefault(parameterTypes[0], DEFAULT_PERSIST_ATTRIBUTE_WRITER);
-  }
+    public PersistAttributeReader getPersistAttributeReader(Method getter) {
+        return persistAttributeReaders.getOrDefault(getter.getReturnType(), DEFAULT_PERSIST_ATTRIBUTE_READER);
+    }
+
+    public PersistAttributeWriter getPersistAttributeWriter(Method setter) {
+        Class<?>[] parameterTypes = setter.getParameterTypes();
+
+        return persistAttributeWriters.getOrDefault(parameterTypes[0], DEFAULT_PERSIST_ATTRIBUTE_WRITER);
+    }
 }
