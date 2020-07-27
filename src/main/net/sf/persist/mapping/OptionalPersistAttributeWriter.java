@@ -1,11 +1,11 @@
 package net.sf.persist.mapping;
 
-import net.sf.persist.PersistException;
-
 import java.lang.reflect.Method;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.util.Optional;
+
+import net.sf.persist.PersistException;
 
 public class OptionalPersistAttributeWriter implements PersistAttributeWriter {
     @Override
