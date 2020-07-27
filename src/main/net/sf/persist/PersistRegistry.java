@@ -1,59 +1,58 @@
 package net.sf.persist;
 
+import net.sf.persist.mapping.DefaultPersistAttributeReader;
+import net.sf.persist.mapping.DefaultPersistAttributeWriter;
+import net.sf.persist.mapping.OptionalPersistAttributeReader;
+import net.sf.persist.mapping.OptionalPersistAttributeWriter;
+import net.sf.persist.mapping.PersistAttributeReader;
+import net.sf.persist.mapping.PersistAttributeWriter;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.lang.reflect.Method;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import net.sf.persist.mapping.DefaultPersistAttributeGetter;
-import net.sf.persist.mapping.DefaultPersistAttributeSetter;
-import net.sf.persist.mapping.OptionalPersistAttributeGetter;
-import net.sf.persist.mapping.OptionalPersistAttributeSetter;
-import net.sf.persist.mapping.PersistAttributeGetter;
-import net.sf.persist.mapping.PersistAttributeSetter;
-
 public class PersistRegistry {
     private static final Logger LOG = LoggerFactory.getLogger("persist.engine");
     private static final PersistRegistry INSTANCE = new PersistRegistry();
+    public static final DefaultPersistAttributeWriter DEFAULT_PERSIST_ATTRIBUTE_WRITER = new DefaultPersistAttributeWriter();
+    public static final DefaultPersistAttributeReader DEFAULT_PERSIST_ATTRIBUTE_READER = new DefaultPersistAttributeReader();
 
-    private Map<Class, PersistAttributeGetter> persistAttributeGetters = new ConcurrentHashMap<>();
-    private Map<Class, PersistAttributeSetter> persistAttributeSetters = new ConcurrentHashMap<>();
+    private Map<Class, PersistAttributeReader> persistAttributeReaders = new ConcurrentHashMap<>();
+    private Map<Class, PersistAttributeWriter> persistAttributeWriters = new ConcurrentHashMap<>();
 
     public static PersistRegistry getInstance() {
         return INSTANCE;
     }
 
     private PersistRegistry() {
-        registerPersistAttributeGetter(Optional.class, new OptionalPersistAttributeGetter());
-        registerPersistAttributeSetter(Optional.class, new OptionalPersistAttributeSetter());
+        registerPersistAttributeReader(Optional.class, new OptionalPersistAttributeReader());
+        registerPersistAttributeWriter(Optional.class, new OptionalPersistAttributeWriter());
     }
 
-    public void registerPersistAttributeGetter(Class clazz, PersistAttributeGetter persistAttributeGetter) {
-        if (persistAttributeGetters.containsKey(clazz)) {
-            LOG.warn(String.format("Overriding PersistAttributeGetter for type %s", clazz));
+    public void registerPersistAttributeReader(Class clazz, PersistAttributeReader persistAttributeReader) {
+        if (persistAttributeReaders.containsKey(clazz)) {
+            LOG.warn(String.format("Overriding PersistAttributeReader for type %s", clazz));
         }
-        persistAttributeGetters.put(clazz, persistAttributeGetter);
+        persistAttributeReaders.put(clazz, persistAttributeReader);
     }
 
-    public void registerPersistAttributeSetter(Class clazz, PersistAttributeSetter persistAttributeSetter) {
-        if (persistAttributeGetters.containsKey(clazz)) {
-            LOG.warn(String.format("Overriding PersistAttributeSetter for type %s", clazz));
+    public void registerPersistAttributeWriter(Class clazz, PersistAttributeWriter persistAttributeWriter) {
+        if (persistAttributeReaders.containsKey(clazz)) {
+            LOG.warn(String.format("Overriding PersistAttributeWriter for type %s", clazz));
         }
-        persistAttributeSetters.put(clazz, persistAttributeSetter);
+        persistAttributeWriters.put(clazz, persistAttributeWriter);
     }
 
-    public PersistAttributeGetter findPersistAttributeGetter(Method getter) {
-        return persistAttributeGetters.getOrDefault(getter.getReturnType(), new DefaultPersistAttributeGetter());
+    public PersistAttributeReader getPersistAttributeReader(Method getter) {
+        return persistAttributeReaders.getOrDefault(getter.getReturnType(), DEFAULT_PERSIST_ATTRIBUTE_READER);
     }
 
-    public PersistAttributeSetter findPersistAttributeSetter(Method setter) {
+    public PersistAttributeWriter getPersistAttributeWriter(Method setter) {
         Class<?>[] parameterTypes = setter.getParameterTypes();
-        if (parameterTypes.length != 1) {
-            throw new PersistException(String.format("%s is not a valid setter", setter));
-        }
-        return persistAttributeSetters.getOrDefault(parameterTypes[0], new DefaultPersistAttributeSetter());
+
+        return persistAttributeWriters.getOrDefault(parameterTypes[0], DEFAULT_PERSIST_ATTRIBUTE_WRITER);
     }
 }
