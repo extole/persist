@@ -1,25 +1,19 @@
 package net.sf.persist;
 
+import net.sf.persist.mapping.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.lang.reflect.Method;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
-import net.sf.persist.mapping.DefaultPersistAttributeReader;
-import net.sf.persist.mapping.DefaultPersistAttributeWriter;
-import net.sf.persist.mapping.OptionalPersistAttributeReader;
-import net.sf.persist.mapping.OptionalPersistAttributeWriter;
-import net.sf.persist.mapping.PersistAttributeReader;
-import net.sf.persist.mapping.PersistAttributeWriter;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 public class PersistRegistry {
     private static final Logger LOG = LoggerFactory.getLogger("persist.engine");
     private static final PersistRegistry INSTANCE = new PersistRegistry();
-    public static final DefaultPersistAttributeWriter DEFAULT_PERSIST_ATTRIBUTE_WRITER = new DefaultPersistAttributeWriter();
-    public static final DefaultPersistAttributeReader DEFAULT_PERSIST_ATTRIBUTE_READER = new DefaultPersistAttributeReader();
+    private static final DefaultPersistAttributeWriter DEFAULT_PERSIST_ATTRIBUTE_WRITER = new DefaultPersistAttributeWriter();
+    private static final DefaultPersistAttributeReader DEFAULT_PERSIST_ATTRIBUTE_READER = new DefaultPersistAttributeReader();
 
     private final Map<Class, PersistAttributeReader> persistAttributeReaders = new ConcurrentHashMap<>();
     private final Map<Class, PersistAttributeWriter> persistAttributeWriters = new ConcurrentHashMap<>();
