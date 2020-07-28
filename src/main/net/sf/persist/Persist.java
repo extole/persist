@@ -1057,7 +1057,7 @@ public final class Persist {
                         PersistAttributeWriter persistAttributeWriter =
                                 PersistRegistry.getInstance().getPersistAttributeWriter(setter);
                         final Object value = getValueFromResultSet(resultSet, i, persistAttributeWriter.getJDBCDataType(setter));
-                        persistAttributeWriter.setValue(ret,setter,value);
+                        persistAttributeWriter.setValue(ret, setter, value);
                     } catch (Exception e) {
                         String message = String.format("Error setting value using setter [%s]", setter);
                         throw new PersistException(message, e);

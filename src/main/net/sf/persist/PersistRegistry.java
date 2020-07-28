@@ -1,6 +1,11 @@
 package net.sf.persist;
 
-import net.sf.persist.mapping.*;
+import net.sf.persist.mapping.DefaultPersistAttributeReader;
+import net.sf.persist.mapping.DefaultPersistAttributeWriter;
+import net.sf.persist.mapping.OptionalPersistAttributeReader;
+import net.sf.persist.mapping.OptionalPersistAttributeWriter;
+import net.sf.persist.mapping.PersistAttributeReader;
+import net.sf.persist.mapping.PersistAttributeWriter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
