@@ -6,6 +6,7 @@ import org.slf4j.LoggerFactory;
 
 import java.lang.reflect.Method;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -28,17 +29,17 @@ public class PersistRegistry {
     }
 
     public void registerPersistAttributeReader(Class clazz, PersistAttributeReader persistAttributeReader) {
-        if (persistAttributeReaders.containsKey(clazz)) {
+        PersistAttributeReader overriddenReader = persistAttributeReaders.put(clazz, persistAttributeReader);
+        if (Objects.nonNull(overriddenReader)) {
             LOG.warn("Overriding PersistAttributeReader for type {}", clazz);
         }
-        persistAttributeReaders.put(clazz, persistAttributeReader);
     }
 
     public void registerPersistAttributeWriter(Class clazz, PersistAttributeWriter persistAttributeWriter) {
-        if (persistAttributeReaders.containsKey(clazz)) {
+        PersistAttributeWriter overriddenWriter = persistAttributeWriters.put(clazz, persistAttributeWriter);
+        if (Objects.nonNull(overriddenWriter)) {
             LOG.warn("Overriding PersistAttributeWriter for type {}", clazz);
         }
-        persistAttributeWriters.put(clazz, persistAttributeWriter);
     }
 
     public PersistAttributeReader getPersistAttributeReader(Method getter) {
