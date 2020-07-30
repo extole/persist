@@ -36,14 +36,16 @@ public class PersistRegistry {
     public void registerPersistAttributeReader(Class clazz, PersistAttributeReader persistAttributeReader) {
         PersistAttributeReader overriddenReader = persistAttributeReaders.put(clazz, persistAttributeReader);
         if (Objects.nonNull(overriddenReader)) {
-            LOG.warn("Overriding PersistAttributeReader for type {}", clazz);
+            LOG.warn("Overriding {} PersistAttributeReader for type {} with {}",
+                    new Object[]{overriddenReader.getClass(), clazz, persistAttributeReader.getClass()});
         }
     }
 
     public void registerPersistAttributeWriter(Class clazz, PersistAttributeWriter persistAttributeWriter) {
         PersistAttributeWriter overriddenWriter = persistAttributeWriters.put(clazz, persistAttributeWriter);
         if (Objects.nonNull(overriddenWriter)) {
-            LOG.warn("Overriding PersistAttributeWriter for type {}", clazz);
+            LOG.warn("Overriding {} PersistAttributeWriter for type {} with {}",
+                    new Object[]{overriddenWriter.getClass(), clazz, persistAttributeWriter.getClass()});
         }
     }
 
