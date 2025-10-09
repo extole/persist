@@ -1246,7 +1246,7 @@ public final class Persist {
     public int insert(final Object object) {
         final AnnotationTableMapping mapping = getTableMapping(object.getClass(), "insert()");
         final String sql = mapping.getInsertSql();
-        final String[] columns = mapping.getWritableColumns();
+        final String[] columns = mapping.getInsertColumns();
         final Object[] parameters = getParametersFromObject(object, columns, mapping);
 
         int ret = 0;
@@ -1294,10 +1294,10 @@ public final class Persist {
             throw new PersistException("Table " + mapping.getTableName() + " doesn't have a primary key");
         }
         final String sql = mapping.getUpdateSql();
-        final String[] columns = new String[mapping.getWritableNotPrimaryKeys().length + mapping.getPrimaryKeys().length];
+        final String[] columns = new String[mapping.getUpdateColumns().length + mapping.getPrimaryKeys().length];
         int i = 0;
-        for (String writableNotPrimaryKey : mapping.getWritableNotPrimaryKeys()) {
-            columns[i++] = writableNotPrimaryKey;
+        for (String updateColumn : mapping.getUpdateColumns()) {
+            columns[i++] = updateColumn;
         }
         for (String primaryKey : mapping.getPrimaryKeys()) {
             columns[i++] = primaryKey;
