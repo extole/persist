@@ -2,10 +2,12 @@
 
 package net.sf.persist;
 
+import net.sf.persist.annotations.Column;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.lang.reflect.Method;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -24,13 +26,11 @@ public final class AnnotationTableMapping extends Mapping {
     private final net.sf.persist.annotations.Table tableAnnotation;
     private final String tableName;
 
-    private final List<String> fields;
     private final Map<String, net.sf.persist.annotations.Column> annotationsMap;
-    private final Map<String, Method> gettersMap;
-    private final Map<String, Method> settersMap;
+    private final Map<String, Method> getterByFieldName;
+    private final Map<String, Method> setterByFieldName;
 
-    private final Map<String, String> columnsMap = new LinkedHashMap<>();
-    private final List<net.sf.persist.annotations.Column> columns;
+    private final Map<String, String> fieldNameByColumnName = new LinkedHashMap<>();
     private final List<String> selectColumns;
     private final List<String> primaryKeys;
     private final List<String> notPrimaryKeys;
@@ -46,7 +46,6 @@ public final class AnnotationTableMapping extends Mapping {
     private final String deleteSql;
 
     public AnnotationTableMapping(final Class<?> objectClass) {
-
         // object class
         this.objectClass = objectClass;
 
@@ -63,16 +62,14 @@ public final class AnnotationTableMapping extends Mapping {
         // map field names to annotations, getters and setters
         final Map[] fieldsMaps = getFieldsMaps(objectClass);
         annotationsMap = fieldsMaps[0];
-        gettersMap = fieldsMaps[1];
-        settersMap = fieldsMaps[2];
-        fields = List.copyOf(gettersMap.keySet());
+        getterByFieldName = fieldsMaps[1];
+        setterByFieldName = fieldsMaps[2];
 
-        columns = fields.stream()
-            .map(annotationsMap::get)
-            .collect(Collectors.toList());
-
-        for (int i = 0; i < fields.size(); i++) {
-            columnsMap.put(columns.get(i).name().toLowerCase(Locale.ENGLISH), fields.get(i));
+        List<net.sf.persist.annotations.Column> columns = new ArrayList<>();
+        for (String fieldName : getterByFieldName.keySet()) {
+            Column column = annotationsMap.get(fieldName);
+            columns.add(column);
+            fieldNameByColumnName.put(column.name().toLowerCase(Locale.ENGLISH), fieldName);
         }
 
         primaryKeys = columns.stream()
@@ -147,16 +144,12 @@ public final class AnnotationTableMapping extends Mapping {
         return tableAnnotation;
     }
 
-    public List<net.sf.persist.annotations.Column> getColumns() {
-        return columns;
-    }
-
     public List<String> getSelectColumns() {
         return selectColumns;
     }
 
-    public Map<String, String> getColumnsMap() {
-        return columnsMap;
+    public Map<String, String> getFieldNameByColumnName() {
+        return fieldNameByColumnName;
     }
 
     public List<String> getPrimaryKeys() {
@@ -183,32 +176,28 @@ public final class AnnotationTableMapping extends Mapping {
         return updateColumns;
     }
 
-    public List<String> getFields() {
-        return fields;
-    }
-
     public Map<String, net.sf.persist.annotations.Column> getAnnotationsMap() {
         return annotationsMap;
     }
 
-    public Map<String, Method> getGettersMap() {
-        return gettersMap;
+    public Map<String, Method> getGetterByFieldName() {
+        return getterByFieldName;
     }
 
-    public Map<String, Method> getSettersMap() {
-        return settersMap;
+    public Map<String, Method> getSetterByFieldName() {
+        return setterByFieldName;
     }
 
     @Override
     public Method getGetterForColumn(final String columnName) {
-        final String fieldName = columnsMap.get(columnName.toLowerCase(Locale.ENGLISH));
-        return gettersMap.get(fieldName);
+        final String fieldName = fieldNameByColumnName.get(columnName.toLowerCase(Locale.ENGLISH));
+        return getterByFieldName.get(fieldName);
     }
 
     @Override
     public Method getSetterForColumn(final String columnName) {
-        final String fieldName = columnsMap.get(columnName.toLowerCase(Locale.ENGLISH));
-        return settersMap.get(fieldName);
+        final String fieldName = fieldNameByColumnName.get(columnName.toLowerCase(Locale.ENGLISH));
+        return setterByFieldName.get(fieldName);
     }
 
     public String getSelectSql() {
